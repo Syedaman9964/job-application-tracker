@@ -1,16 +1,55 @@
-# React + Vite
+﻿# Job Application Tracker
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+A React web application to organize and track job applications in one place.
 
-Currently, two official plugins are available:
+## Live Demo
+https://silly-cobbler-3a5f27.netlify.app
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Features
+- Add, edit, and delete job applications
+- Search by company name or job role
+- Filter applications by status
+- Dashboard statistics and charts
+- Save data in the browser using localStorage
+- Responsive dashboard UI
 
-## React Compiler
+## Tech Stack
+- React
+- JavaScript
+- Vite
+- CSS
+- Recharts
+- Lucide React
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Run Locally
 
-## Expanding the Oxlint configuration
+1. Clone this repository:
+   ```bash
+   git clone https://github.com/Syedaman9964/job-application-tracker.git
+   ```
+2. Open the project folder:
+   ```bash
+   cd job-application-tracker
+   ```
+3. Install dependencies:
+   ```bash
+   npm install
+   ```
+4. Start the development server:
+   ```bash
+   npm run dev
+   ```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+## What I Learned
+- Building a React application
+- Managing application state
+- Using localStorage for browser-based persistence
+- Implementing search and filtering
+- Creating dashboard charts
+- Using Git and GitHub for version control
+
+## Developer Goals
+I am learning software development, building practical projects, and preparing for IT fresher opportunities.
+
+## GitHub
+https://github.com/Syedaman9964/job-application-tracker
