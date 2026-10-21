@@ -222,3 +222,56 @@ button:hover {
 .form-actions button[type="button"]:hover {
   background: #cbd5e1;
 }
+
+.application-tools {
+  display: flex;
+  gap: 12px;
+  margin: 20px 0;
+  flex-wrap: wrap;
+}
+
+.application-tools input {
+  flex: 1;
+  min-width: 200px;
+}
+
+.application-tools input,
+.application-tools select {
+  padding: 12px;
+  border: 1px solid #d8dce5;
+  border-radius: 8px;
+  font: inherit;
+  background: white;
+}
+
+.application-list {
+  display: grid;
+  gap: 14px;
+}
+
+.application-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.application-item .form-actions {
+  margin-top: 0;
+}
+
+.application-item .form-actions button:last-child {
+  background: #dc3545;
+  color: white;
+}
+
+@media (max-width: 600px) {
+  .application-tools {
+    flex-direction: column;
+  }
+
+  .application-item {
+    align-items: flex-start;
+  }
+}
