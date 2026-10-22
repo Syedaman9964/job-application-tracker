@@ -1,280 +1,361 @@
+import { useState, useEffect, useCallback } from 'react'
+import Sidebar from './components/layout/Sidebar.jsx'
+import Header from './components/layout/Header.jsx'
+import DashboardView from './components/dashboard/DashboardView.jsx'
+import ApplicationsTable from './components/applications/ApplicationsTable.jsx'
+import KanbanBoard from './components/kanban/KanbanBoard.jsx'
+import FollowUpHub from './components/followups/FollowUpHub.jsx'
+import DataSafetyHub from './components/data/DataSafetyHub.jsx'
+import SettingsView from './components/settings/SettingsView.jsx'
+import ApplicationFormModal from './components/applications/ApplicationFormModal.jsx'
+import ApplicationDetailModal from './components/applications/ApplicationDetailModal.jsx'
+import ConfirmDialog from './components/common/ConfirmDialog.jsx'
+import Toast from './components/common/Toast.jsx'
 
-import { useEffect, useState } from 'react'
 import {
-  BriefcaseBusiness, LayoutDashboard, Search, Plus, Pencil, Trash2,
-  Send, CalendarCheck, Trophy, XCircle, TrendingUp, Filter,
-} from 'lucide-react'
-import {
-  ResponsiveContainer, PieChart, Pie, Cell, Tooltip,
-  BarChart, Bar, XAxis, YAxis, CartesianGrid,
-} from 'recharts'
+  loadApplications,
+  saveApplications,
+  loadSettings,
+  saveSettings,
+  normalizeApplication,
+  getSampleApplications,
+} from './utils/storage.js'
 import './App.css'
 
-const STORAGE_KEY = 'jobtrack-applications'
-const STATUSES = ['Applied', 'Interview', 'Offer', 'Rejected']
-const COLORS = ['#6366f1', '#f59e0b', '#10b981', '#ef4444']
+export default function App() {
+  // Load applications safely from localStorage
+  const [applications, setApplications] = useState(() => loadApplications())
 
-function App() {
-  const [applications, setApplications] = useState(() => {
-    try {
-      return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]')
-    } catch {
-      return []
-    }
-  })
-  const [showForm, setShowForm] = useState(false)
-  const [editingId, setEditingId] = useState(null)
-  const [search, setSearch] = useState('')
-  const [filterStatus, setFilterStatus] = useState('All')
+  // Load user settings
+  const [settings, setSettings] = useState(() => loadSettings())
 
+  // View state: 'dashboard' | 'applications' | 'kanban' | 'followups' | 'data' | 'settings'
+  const [currentView, setCurrentView] = useState(() => settings.defaultView || 'dashboard')
+
+  // Modals & Dialogs state
+  const [isFormModalOpen, setIsFormModalOpen] = useState(false)
+  const [formInitialData, setFormInitialData] = useState(null)
+  const [detailApp, setDetailApp] = useState(null)
+  const [deleteCandidateId, setDeleteCandidateId] = useState(null)
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
+
+  // Toast feedback state
+  const [toast, setToast] = useState(null)
+
+  // Synchronize applications to localStorage
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(applications))
+    saveApplications(applications)
   }, [applications])
 
-  const editingApp = applications.find((app) => app.id === editingId)
+  // Synchronize settings to localStorage
+  useEffect(() => {
+    saveSettings(settings)
+  }, [settings])
 
-  const openAddForm = () => {
-    setEditingId(null)
-    setShowForm(true)
+  // Show auto-dismiss toast notification
+  const showToast = useCallback((message, type = 'success') => {
+    setToast({ message, type })
+    const timer = setTimeout(() => {
+      setToast((curr) => (curr?.message === message ? null : curr))
+    }, 3500)
+    return () => clearTimeout(timer)
+  }, [])
+
+  // Open Add modal (optionally prefilled with stage)
+  const handleOpenAddModal = (preset = null) => {
+    setFormInitialData(preset)
+    setIsFormModalOpen(true)
   }
 
-  const handleSubmit = (event) => {
-    event.preventDefault()
-    const data = new FormData(event.currentTarget)
-    const details = {
-      company: data.get('company').trim(),
-      role: data.get('role').trim(),
-      date: data.get('date'),
-      status: data.get('status'),
-    }
+  // Open Edit modal
+  const handleOpenEditModal = (app) => {
+    setFormInitialData(app)
+    setIsFormModalOpen(true)
+  }
 
-    if (editingId) {
+  // Save Application (Add or Update)
+  const handleSaveApplication = (formData) => {
+    const isEditing = Boolean(formData.id)
+    const nowISO = new Date().toISOString()
+
+    if (isEditing) {
       setApplications((prev) =>
-        prev.map((app) => app.id === editingId ? { ...app, ...details } : app),
+        prev.map((item) =>
+          item.id === formData.id
+            ? normalizeApplication({ ...item, ...formData, updatedAt: nowISO })
+            : item,
+        ),
       )
+      // Update detail modal if open
+      if (detailApp?.id === formData.id) {
+        setDetailApp((curr) => ({ ...curr, ...formData, updatedAt: nowISO }))
+      }
+      showToast(`Updated application for ${formData.company}`)
     } else {
-      setApplications((prev) => [
-        { id: crypto.randomUUID(), ...details },
-        ...prev,
-      ])
-    }
-
-    setShowForm(false)
-    setEditingId(null)
-  }
-
-  const deleteApplication = (id) => {
-    if (window.confirm('Delete this application?')) {
-      setApplications((prev) => prev.filter((app) => app.id !== id))
+      const newRecord = normalizeApplication({
+        ...formData,
+        id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
+        createdAt: nowISO,
+        updatedAt: nowISO,
+      })
+      setApplications((prev) => [newRecord, ...prev])
+      showToast(`Added application for ${formData.company}`)
     }
   }
 
-  const counts = Object.fromEntries(
-    STATUSES.map((status) => [
-      status,
-      applications.filter((app) => app.status === status).length,
-    ]),
-  )
+  // Quick Stage change (from Table, Board, or Detail Modal)
+  const handleStatusChange = (appId, newStatus) => {
+    setApplications((prev) =>
+      prev.map((app) =>
+        app.id === appId
+          ? { ...app, status: newStatus, updatedAt: new Date().toISOString() }
+          : app,
+      ),
+    )
+    if (detailApp?.id === appId) {
+      setDetailApp((curr) => ({ ...curr, status: newStatus }))
+    }
+    const target = applications.find((a) => a.id === appId)
+    const name = target ? target.company : 'Application'
+    showToast(`Moved ${name} to ${newStatus}`)
+  }
 
-  const filteredApplications = applications.filter((app) => {
-    const query = search.toLowerCase()
-    const matchesSearch =
-      app.company.toLowerCase().includes(query) ||
-      app.role.toLowerCase().includes(query)
-    return matchesSearch && (filterStatus === 'All' || app.status === filterStatus)
-  })
+  // Toggle follow-up complete status
+  const handleToggleFollowUp = (appId) => {
+    setApplications((prev) =>
+      prev.map((app) => {
+        if (app.id !== appId) return app
+        const updatedDone = !app.nextFollowUpDone
+        return {
+          ...app,
+          nextFollowUpDone: updatedDone,
+          updatedAt: new Date().toISOString(),
+        }
+      }),
+    )
+    if (detailApp?.id === appId) {
+      setDetailApp((curr) => ({ ...curr, nextFollowUpDone: !curr.nextFollowUpDone }))
+    }
+    showToast('Updated task status')
+  }
 
-  const chartData = STATUSES
-    .map((status) => ({ name: status, value: counts[status] }))
-    .filter((item) => item.value > 0)
+  // Request deletion confirmation
+  const handleRequestDelete = (appId) => {
+    setDeleteCandidateId(appId)
+  }
 
-  const stats = [
-    { label: 'Total Applications', value: applications.length, icon: BriefcaseBusiness, tone: 'purple' },
-    { label: 'Interviews', value: counts.Interview, icon: CalendarCheck, tone: 'orange' },
-    { label: 'Offers', value: counts.Offer, icon: Trophy, tone: 'green' },
-    { label: 'Rejected', value: counts.Rejected, icon: XCircle, tone: 'red' },
-  ]
+  // Confirm delete
+  const handleConfirmDelete = () => {
+    if (!deleteCandidateId) return
+    const target = applications.find((a) => a.id === deleteCandidateId)
+    setApplications((prev) => prev.filter((a) => a.id !== deleteCandidateId))
+    if (detailApp?.id === deleteCandidateId) {
+      setDetailApp(null)
+    }
+    setDeleteCandidateId(null)
+    showToast(`Deleted ${target ? target.company : 'application'}`)
+  }
+
+  // Load Curated Sample Data
+  const handleLoadSampleData = () => {
+    const samples = getSampleApplications()
+    // Append or replace
+    setApplications((prev) => {
+      const existingIds = new Set(prev.map((a) => a.company.toLowerCase()))
+      const nonDuplicates = samples.filter((s) => !existingIds.has(s.company.toLowerCase()))
+      return [...nonDuplicates, ...prev]
+    })
+    showToast('Loaded 5 sample applications into your pipeline')
+  }
+
+  // Import from JSON (merge or replace)
+  const handleImportApplications = (importedList, mode) => {
+    if (mode === 'replace') {
+      setApplications(importedList)
+    } else {
+      // Merge by matching company + role
+      setApplications((prev) => {
+        const existingKeys = new Set(prev.map((a) => `${a.company.toLowerCase()}__${a.role.toLowerCase()}`))
+        const newRecords = importedList.filter(
+          (imp) => !existingKeys.has(`${imp.company.toLowerCase()}__${imp.role.toLowerCase()}`),
+        )
+        return [...newRecords, ...prev]
+      })
+    }
+  }
+
+  // Clear all data
+  const handleClearAllData = () => {
+    setApplications([])
+    setDetailApp(null)
+  }
+
+  // Update Settings
+  const handleSaveSettings = (newSettings) => {
+    setSettings((curr) => ({ ...curr, ...newSettings }))
+  }
+
+  // Titles per view
+  const viewTitles = {
+    dashboard: {
+      title: 'Career Dashboard',
+      subtitle: 'Overview of your pipeline, scheduled rounds, and weekly progress.',
+    },
+    applications: {
+      title: 'Applications Directory',
+      subtitle: 'Search, filter, and manage all your career opportunities.',
+    },
+    kanban: {
+      title: 'Pipeline Board',
+      subtitle: 'Visualize stages and drag opportunities through your hiring pipeline.',
+    },
+    followups: {
+      title: 'Follow-ups & Action Items',
+      subtitle: 'Keep track of recruiter deadlines, tasks, and upcoming interview dates.',
+    },
+    data: {
+      title: 'Data & Privacy',
+      subtitle: 'Local-first client storage, JSON backups, and CSV export tools.',
+    },
+    settings: {
+      title: 'Settings & About',
+      subtitle: 'Preferences, weekly targets, and portfolio information.',
+    },
+  }
+
+  const { title, subtitle } = viewTitles[currentView] || viewTitles.dashboard
 
   return (
-    <div className="app">
-      <aside className="sidebar">
-        <div className="brand">
-          <span className="brand-icon"><BriefcaseBusiness size={22} /></span>
-          <span>JobTrack<span className="brand-dot">.</span></span>
-        </div>
-        <p className="sidebar-label">WORKSPACE</p>
-        <div className="nav-item active"><LayoutDashboard size={18} /> Dashboard</div>
-        <div className="nav-item"><BriefcaseBusiness size={18} /> My Applications</div>
-        <div className="sidebar-note">
-          <TrendingUp size={20} />
-          <strong>Keep moving forward</strong>
-          <p>Every application is a step toward your next opportunity.</p>
-        </div>
-        <div className="sidebar-footer">JOB SEARCH ORGANIZER</div>
-      </aside>
+    <div className="app-container">
+      {/* Sidebar Navigation */}
+      <Sidebar
+        currentView={currentView}
+        onNavigate={setCurrentView}
+        applicationCount={applications.length}
+        onOpenAddModal={() => handleOpenAddModal()}
+        mobileOpen={mobileSidebarOpen}
+        onCloseMobile={() => setMobileSidebarOpen(false)}
+      />
 
-      <main className="main-content">
-        <header className="header">
-          <div>
-            <p className="eyebrow">YOUR CAREER JOURNEY</p>
-            <h1>Dashboard</h1>
-            <p className="header-subtitle">Stay organised. Track progress. Land your next role.</p>
-          </div>
-          <button className="primary-button" onClick={openAddForm}>
-            <Plus size={18} /> Add Application
-          </button>
-        </header>
+      {/* Main Content Area */}
+      <main className="app-main">
+        <Header
+          title={title}
+          subtitle={subtitle}
+          onOpenAddModal={() => handleOpenAddModal()}
+          onToggleMobileSidebar={() => setMobileSidebarOpen((prev) => !prev)}
+        />
 
-        <section className="stats">
-          {stats.map(({ label, value, icon: Icon, tone }) => (
-            <div className="stat-card stat-modern" key={label}>
-              <div className={`stat-icon ${tone}`}><Icon size={21} /></div>
-              <p>{label}</p>
-              <h2>{value}</h2>
-              <span className="stat-caption">Tracked applications</span>
-            </div>
-          ))}
-        </section>
-
-        <section className="analytics-grid">
-          <div className="panel chart-panel">
-            <div className="panel-heading">
-              <div><h2>Application Overview</h2><p>Breakdown by current status</p></div>
-            </div>
-            {chartData.length === 0 ? (
-              <div className="chart-empty">Add an application to see your progress chart.</div>
-            ) : (
-              <div className="chart-content">
-                <div className="pie-wrap">
-                  <ResponsiveContainer width="100%" height={220}>
-                    <PieChart>
-                      <Pie data={chartData} dataKey="value" nameKey="name"
-                        cx="50%" cy="50%" innerRadius={57} outerRadius={84}
-                        paddingAngle={4}>
-                        {chartData.map((item) => (
-                          <Cell key={item.name} fill={COLORS[STATUSES.indexOf(item.name)]} />
-                        ))}
-                      </Pie>
-                      <Tooltip />
-                    </PieChart>
-                  </ResponsiveContainer>
-                  <div className="pie-center">
-                    <strong>{applications.length}</strong><span>Total</span>
-                  </div>
-                </div>
-                <div className="chart-legend">
-                  {STATUSES.map((status, index) => (
-                    <div className="legend-row" key={status}>
-                      <span className="legend-dot" style={{ background: COLORS[index] }} />
-                      <span>{status}</span><strong>{counts[status]}</strong>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="panel chart-panel">
-            <div className="panel-heading">
-              <div><h2>Status Summary</h2><p>Applications by stage</p></div>
-            </div>
-            <div className="bar-chart">
-              <ResponsiveContainer width="100%" height={250}>
-                <BarChart data={STATUSES.map((status) => ({ status, total: counts[status] }))} margin={{ top: 12, right: 4, left: -24, bottom: 4 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#edf0f6" />
-                  <XAxis dataKey="status" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
-                  <YAxis allowDecimals={false} tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
-                  <Tooltip />
-                  <Bar dataKey="total" name="Applications" fill="#6366f1" radius={[6, 6, 0, 0]} maxBarSize={42} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-        </section>
-
-        <section className="panel applications-panel">
-          <div className="applications-heading">
-            <div><h2>My Applications</h2><p>Manage and track your job opportunities</p></div>
-            <span className="total-pill">{applications.length} total</span>
-          </div>
-
-          <div className="application-tools">
-            <div className="search-box">
-              <Search size={18} />
-              <input type="search" placeholder="Search company or role..."
-                value={search} onChange={(e) => setSearch(e.target.value)} />
-            </div>
-            <div className="filter-box">
-              <Filter size={17} />
-              <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
-                <option value="All">All statuses</option>
-                {STATUSES.map((status) => <option key={status}>{status}</option>)}
-              </select>
-            </div>
-          </div>
-
-          {showForm && (
-            <form key={editingId || 'new'} className="application-form" onSubmit={handleSubmit}>
-              <div className="form-title">
-                <h3>{editingApp ? 'Edit Application' : 'New Application'}</h3>
-                <button className="icon-button" type="button" onClick={() => { setShowForm(false); setEditingId(null) }} aria-label="Close form"><XCircle size={19} /></button>
-              </div>
-              <div className="form-grid">
-                <label>Company Name
-                  <input name="company" placeholder="e.g. Infosys" defaultValue={editingApp?.company || ''} required />
-                </label>
-                <label>Job Role
-                  <input name="role" placeholder="e.g. Software Engineer" defaultValue={editingApp?.role || ''} required />
-                </label>
-                <label>Application Date
-                  <input name="date" type="date" defaultValue={editingApp?.date || new Date().toISOString().slice(0, 10)} required />
-                </label>
-                <label>Status
-                  <select name="status" defaultValue={editingApp?.status || 'Applied'}>
-                    {STATUSES.map((status) => <option key={status}>{status}</option>)}
-                  </select>
-                </label>
-              </div>
-              <div className="form-actions">
-                <button className="primary-button" type="submit">{editingApp ? 'Update Application' : 'Save Application'}</button>
-                <button className="secondary-button" type="button" onClick={() => { setShowForm(false); setEditingId(null) }}>Cancel</button>
-              </div>
-            </form>
+        <div className="app-view-body">
+          {currentView === 'dashboard' && (
+            <DashboardView
+              applications={applications}
+              weeklyGoal={settings.weeklyGoal}
+              onNavigate={setCurrentView}
+              onOpenAddModal={handleOpenAddModal}
+              onLoadSampleData={handleLoadSampleData}
+              onToggleFollowUp={handleToggleFollowUp}
+              onViewDetails={setDetailApp}
+            />
           )}
 
-          {filteredApplications.length === 0 ? (
-            <div className="empty-state">
-              <div className="empty-icon"><Send size={25} /></div>
-              <h3>{applications.length === 0 ? 'Your next opportunity starts here' : 'No matching applications'}</h3>
-              <p>{applications.length === 0 ? 'Add your first application to start tracking your job search.' : 'Try changing your search or filter.'}</p>
-              {applications.length === 0 && <button className="primary-button" onClick={openAddForm}><Plus size={17} /> Add your first application</button>}
-            </div>
-          ) : (
-            <div className="table-wrap">
-              <table className="applications-table">
-                <thead><tr><th>COMPANY & ROLE</th><th>DATE APPLIED</th><th>STATUS</th><th>ACTIONS</th></tr></thead>
-                <tbody>
-                  {filteredApplications.map((app) => (
-                    <tr key={app.id}>
-                      <td><div className="company-cell"><span className="company-avatar">{app.company.charAt(0).toUpperCase()}</span><span><strong>{app.company}</strong><small>{app.role}</small></span></div></td>
-                      <td>{app.date}</td>
-                      <td><span className={`status-badge ${app.status.toLowerCase()}`}>{app.status}</span></td>
-                      <td><div className="row-actions">
-                        <button className="icon-button edit-action" onClick={() => { setEditingId(app.id); setShowForm(true) }} aria-label="Edit application"><Pencil size={16} /></button>
-                        <button className="icon-button delete-action" onClick={() => deleteApplication(app.id)} aria-label="Delete application"><Trash2 size={16} /></button>
-                      </div></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+          {currentView === 'applications' && (
+            <ApplicationsTable
+              applications={applications}
+              onViewDetails={setDetailApp}
+              onEdit={handleOpenEditModal}
+              onDelete={handleRequestDelete}
+              onStatusChange={handleStatusChange}
+              onOpenAddModal={handleOpenAddModal}
+            />
           )}
-        </section>
 
-        <footer className="page-footer">Built with React · JobTrack © {new Date().getFullYear()}</footer>
+          {currentView === 'kanban' && (
+            <KanbanBoard
+              applications={applications}
+              onStatusChange={handleStatusChange}
+              onViewDetails={setDetailApp}
+              onOpenAddModal={handleOpenAddModal}
+            />
+          )}
+
+          {currentView === 'followups' && (
+            <FollowUpHub
+              applications={applications}
+              onToggleFollowUp={handleToggleFollowUp}
+              onViewDetails={setDetailApp}
+              onEdit={handleOpenEditModal}
+            />
+          )}
+
+          {currentView === 'data' && (
+            <DataSafetyHub
+              applications={applications}
+              onImportApplications={handleImportApplications}
+              onClearAllData={handleClearAllData}
+              onShowToast={showToast}
+            />
+          )}
+
+          {currentView === 'settings' && (
+            <SettingsView
+              settings={settings}
+              onSaveSettings={handleSaveSettings}
+              onLoadSampleData={handleLoadSampleData}
+              onShowToast={showToast}
+            />
+          )}
+        </div>
       </main>
+
+      {/* Add / Edit Application Modal */}
+      {isFormModalOpen && (
+        <ApplicationFormModal
+          isOpen={isFormModalOpen}
+          onClose={() => {
+            setIsFormModalOpen(false)
+            setFormInitialData(null)
+          }}
+          onSubmit={handleSaveApplication}
+          initialData={formInitialData}
+        />
+      )}
+
+      {/* Application Details Modal */}
+      {detailApp && (
+        <ApplicationDetailModal
+          isOpen={Boolean(detailApp)}
+          onClose={() => setDetailApp(null)}
+          application={detailApp}
+          onEdit={handleOpenEditModal}
+          onDelete={handleRequestDelete}
+          onStatusChange={handleStatusChange}
+          onToggleFollowUp={handleToggleFollowUp}
+        />
+      )}
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmDialog
+        isOpen={Boolean(deleteCandidateId)}
+        onClose={() => setDeleteCandidateId(null)}
+        onConfirm={handleConfirmDelete}
+        title="Delete Application"
+        message="Are you sure you want to remove this application from your tracker? This action cannot be undone."
+        confirmText="Delete"
+        cancelText="Keep"
+        isDestructive={true}
+      />
+
+      {/* Toast Notification */}
+      {toast && (
+        <div className="toast-container-fixed">
+          <Toast
+            message={toast.message}
+            type={toast.type}
+            onClose={() => setToast(null)}
+          />
+        </div>
+      )}
     </div>
   )
 }
-
-export default App
