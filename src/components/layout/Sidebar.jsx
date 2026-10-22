@@ -16,6 +16,8 @@ export default function Sidebar({
   onOpenAddModal,
   mobileOpen = false,
   onCloseMobile,
+  adminEmail = 'syedaman996455@gmail.com',
+  onSignOut,
 }) {
   const navItems = [
     {
@@ -122,18 +124,33 @@ export default function Sidebar({
         <div className="sidebar-privacy-box">
           <div className="privacy-header">
             <ShieldCheck size={16} className="privacy-icon" />
-            <span className="privacy-title">Local-First Storage</span>
+            <span className="privacy-title">{onSignOut ? 'Admin Protected' : 'Local-First Storage'}</span>
           </div>
           <p className="privacy-desc">
-            Your application data never leaves this browser. Back up regularly via JSON export.
+            {onSignOut ? (
+              <>Restricted to <strong>{adminEmail}</strong> with database Row Level Security.</>
+            ) : (
+              <>Client local-first storage. Back up regularly via JSON export.</>
+            )}
           </p>
         </div>
 
         <div className="sidebar-footer">
-          <span>JobTrack · v2.0</span>
-          <span className="status-indicator">
-            <span className="indicator-dot" /> Ready
-          </span>
+          <span>JobTrack · v2.1</span>
+          {onSignOut ? (
+            <button
+              type="button"
+              className="sidebar-logout-link"
+              onClick={onSignOut}
+              title="Sign out of admin session"
+            >
+              Sign Out
+            </button>
+          ) : (
+            <span className="status-indicator">
+              <span className="indicator-dot" /> Ready
+            </span>
+          )}
         </div>
       </aside>
     </>

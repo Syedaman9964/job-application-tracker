@@ -5,6 +5,8 @@ import {
   Info,
   Check,
   ExternalLink,
+  ShieldCheck,
+  LogOut,
 } from 'lucide-react'
 
 export default function SettingsView({
@@ -12,6 +14,9 @@ export default function SettingsView({
   onSaveSettings,
   onLoadSampleData,
   onShowToast,
+  adminEmail = 'syedaman996455@gmail.com',
+  isCloudConfigured = false,
+  onSignOut,
 }) {
   const [defaultView, setDefaultView] = useState(settings.defaultView || 'dashboard')
   const [weeklyGoal, setWeeklyGoal] = useState(settings.weeklyGoal || 5)
@@ -129,6 +134,49 @@ export default function SettingsView({
               <Sparkles size={16} />
               <span>Load Curated Demo Applications</span>
             </button>
+          </div>
+        </div>
+
+        {/* Administrator Security & Access Control */}
+        <div className="settings-card security-card">
+          <div className="settings-card-header">
+            <div className="settings-header-icon security">
+              <ShieldCheck size={18} />
+            </div>
+            <div>
+              <h3 className="settings-title">Administrator Security & Access</h3>
+              <p className="settings-subtitle">
+                Single-admin protection policy and authentication status
+              </p>
+            </div>
+          </div>
+          <div className="security-card-body">
+            <div className="security-detail-row">
+              <span className="sec-label">Designated Administrator:</span>
+              <span className="sec-val"><strong>{adminEmail}</strong></span>
+            </div>
+            <div className="security-detail-row">
+              <span className="sec-label">Access Policy:</span>
+              <span className="sec-val">Deny by default (public signups disabled)</span>
+            </div>
+            <div className="security-detail-row">
+              <span className="sec-label">Database Security:</span>
+              <span className="sec-val">
+                {isCloudConfigured ? '✅ Row Level Security (RLS) Active' : '⚡ Local Storage Mode (Unconnected)'}
+              </span>
+            </div>
+            {onSignOut && (
+              <div className="security-action-row">
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={onSignOut}
+                >
+                  <LogOut size={14} />
+                  <span>Sign Out of Administrator Session</span>
+                </button>
+              </div>
+            )}
           </div>
         </div>
 

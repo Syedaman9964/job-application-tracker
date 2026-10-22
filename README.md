@@ -1,12 +1,13 @@
-# JobTrack — Personal Job Application & Pipeline Manager
+# JobTrack — Secure, Single-Admin Personal Career Manager
 
-> A local-first, privacy-focused SaaS-style job search tracker built with React 19, Vite, Recharts, and custom Vanilla CSS.
+> A production-ready, single-admin personal job search tracker built with React 19, Supabase (PostgreSQL with Row Level Security), Netlify Serverless Functions, Resend transactional emails, and custom Vanilla CSS.
 
 [![Live Demo](https://img.shields.io/badge/Live_Demo-Netlify-success?style=flat&logo=netlify)](https://silly-cobbler-3a5f27.netlify.app)
-[![React](https://img.shields.io/badge/React-19-blue?style=flat&logo=react)](https://react.dev/)
-[![Vite](https://img.shields.io/badge/Vite-8-purple?style=flat&logo=vite)](https://vite.dev/)
-[![Vitest](https://img.shields.io/badge/Tests-Vitest_Passing-brightgreen?style=flat&logo=vitest)](https://vitest.dev/)
-[![License](https://img.shields.io/badge/License-MIT-lightgrey)](./LICENSE)
+[![Admin](https://img.shields.io/badge/Admin-syedaman996455%40gmail.com-blue?style=flat&logo=google)](mailto:syedaman996455@gmail.com)
+[![Database](https://img.shields.io/badge/Database-PostgreSQL_RLS-336791?style=flat&logo=postgresql)](https://supabase.com)
+[![Notifications](https://img.shields.io/badge/Alerts-Resend_Email-black?style=flat&logo=resend)](https://resend.com)
+[![Tests](https://img.shields.io/badge/Tests-13_Passing-brightgreen?style=flat&logo=vitest)](https://vitest.dev/)
+[![Security](https://img.shields.io/badge/Security-RLS_+_Netlify_CSP-darkgreen)](./supabase/migrations/01_init.sql)
 
 ---
 
@@ -14,55 +15,80 @@
 
 - **Live Application:** [https://silly-cobbler-3a5f27.netlify.app](https://silly-cobbler-3a5f27.netlify.app)
 - **GitHub Repository:** [https://github.com/Syedaman9964/job-application-tracker](https://github.com/Syedaman9964/job-application-tracker)
+- **Authorized Administrator:** `syedaman996455@gmail.com`
 
 ---
 
-## 💡 Overview
+## 🛡️ Security Architecture & Access Control
 
-Searching for software engineering opportunities involves juggling dozens of concurrent applications, interview rounds, recruiter follow-ups, and salary negotiations. Most spreadsheet trackers are clunky on mobile and lack actionable deadline alerts, while third-party SaaS platforms often sell user data or require monthly subscriptions.
+JobTrack enforces a strict **Deny-by-Default** access control model designed exclusively for one verified administrator:
 
-**JobTrack** is designed as a thoughtfully crafted, personal command center for tech job seekers:
-- **Local-First & 100% Private:** Your job search details, targets, interview schedules, and compensation notes are saved directly in your browser's local storage and never leave your device.
-- **Restrained Editorial Aesthetic:** Tailored with a warm ivory background (`#f8f7f2`), crisp charcoal typography, and subtle muted olive green accents (`#5d6b42`), avoiding generic templates and noisy gradient dashboards.
-- **Zero-Friction Dual Views:** Seamlessly switch between a high-density directory table and a Kanban pipeline board without losing your active filters or context.
+```
+[ Your Browser ]
+      │
+      ├── (1. Log in with Email/Password) ────────► [ Supabase Auth ]
+      │                                                   │ (Signed JWT Token)
+      │◄──────────────────────────────────────────────────┘
+      │
+      ├── (2. Queries with JWT Bearer) ───────────► [ PostgreSQL Database ]
+      │                                                   │
+      │                                        [ Row Level Security (RLS) ]
+      │                                        Checks: auth.email == 'syedaman996455@gmail.com'
+      │                                        ✅ Allow  |  ❌ Reject 403 Forbidden
+      │
+      └── (3. On Change: Trigger Alert) ──────────► [ Netlify Function (Backend) ]
+                                                          │
+                                               [ Verify JWT & Admin Email ]
+                                                          │
+                                                   [ Resend Email API ]
+                                                          │
+                                            📧 Alert to: syedaman996455@gmail.com
+```
+
+### Key Security Safeguards
+1. **Disabled Public Registration:** Public registration is disabled. Only the designated administrator account (`syedaman996455@gmail.com`) can authenticate.
+2. **Database Row Level Security (RLS):** All database operations (`SELECT`, `INSERT`, `UPDATE`, `DELETE`) are verified inside the PostgreSQL engine itself via `auth.jwt() ->> 'email' = 'syedaman996455@gmail.com'`. Tampering with client code or sending direct HTTP requests cannot bypass database-level authorization.
+3. **Protected Serverless Email Dispatch:** Netlify Functions (`netlify/functions/notify.js`) inspect the Supabase JWT token before sending emails via Resend. Anonymous callers are rejected with `401 Unauthorized`.
+4. **Zero Frontend Secrets:** Private API keys (`RESEND_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`) are kept exclusively in Netlify serverless environment variables and are never bundled into client-side JavaScript.
+5. **Strict Security Headers:** `netlify.toml` configures Content-Security-Policy (CSP), `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, and disabled sensitive browser permissions.
 
 ---
 
-## ✨ Verified Feature Tour
+## ✨ Feature Breakdown
 
-### 1. 📊 Real-Time Career Dashboard
-- **True Calculated KPIs:** Total Applications, Active in Pipeline (`Applied` + `Interview`), Scheduled Interviews, and Offers Received.
-- **Conversion Analytics:** Accurately computes interview conversion rates from active records without fabricating numbers.
-- **Personal Weekly Target Tracker:** Configurable weekly application goal with an automated progress bar reflecting actual submissions within the calendar week.
-- **Visual Analytics:** Interactive Recharts Donut chart displaying stage distribution with central counter, plus a responsive stage comparison Bar chart.
-- **Urgent Actions & Deadlines:** Live widget summarizing overdue tasks, today's actions, and interviews scheduled within the next 7 days.
-- **Recent Submissions:** Quick-access feed showing the latest opportunities added to the pipeline.
+### 1. 📊 Career Dashboard
+- **True Calculated Metrics:** Total Applications, Active in Pipeline, Interviews, and Offers.
+- **Conversion Rate:** Computes interview progression percentage from active applications.
+- **Weekly Target Tracker:** User-configurable goal progress bar reflecting actual submissions within the calendar week.
+- **Visual Analytics:** Interactive Recharts Donut chart (pipeline stage breakdown) and Bar chart (volume comparison).
+- **Upcoming Deadlines Widget:** Surfaces overdue actions, today's tasks, and interviews scheduled in the next 7 days.
 
 ### 2. 📋 Applications Directory (Table View)
-- **Deep Search:** Instant fuzzy searching across company name, role, location, and personal notes.
-- **Multi-Faceted Filtering:** Filter by pipeline stage (`Wishlist`, `Applied`, `Interview`, `Offer`, `Rejected`) and employment type (`Full-time`, `Internship`, `Contract`, `Part-time`).
-- **Flexible Sorting:** Sort by newest applied, oldest applied, company name (A-Z, Z-A), or stage.
-- **Pagination & Ergonomics:** Fast client-side pagination with clear result counts and quick stage dropdowns per row.
-- **Accessible Action Controls:** Inspect details, edit fields, or delete records with accessible confirmation dialogs.
+- **Deep Search:** Instant filtering across company name, role, location, and notes.
+- **Multi-Filter & Sort:** Filter by Pipeline Stage and Employment Type; sort by date, company name, or status.
+- **Pagination & Ergonomics:** Fast client-side pagination with clear result counts and per-row quick status selectors.
 
 ### 3. 📌 Pipeline Board (Kanban View)
 - **5 Distinct Stages:** `Wishlist` ➔ `Applied` ➔ `Interview` ➔ `Offer` ➔ `Rejected`.
-- **Drag-and-Drop & Dropdowns:** Support for native HTML5 drag-and-drop between columns, complemented by accessible stage-selection dropdowns on every card.
-- **Rich Card Metadata:** Displays company avatar, role, location tags, compensation range, and date applied.
-- **Column-Level Actions:** One-click quick creation directly into any selected stage.
+- **HTML5 Drag-and-Drop:** Drag cards across columns or use the accessible stage dropdown on any card.
+- **Card Badges:** Displays location tags, compensation range, and deadline alerts.
 
-### 4. ⏰ Follow-ups & Action Items Hub
-- **Unified Timeline:** Aggregates all recruiter follow-up dates and scheduled interview rounds in one dedicated view.
-- **Status Filters:** Instant filters for Active Tasks, Due This Week, Overdue Actions, Interview Rounds, and Completed Tasks.
-- **Interactive Checkboxes:** Toggle task completion with automated timestamp updates.
-- **Interview Highlights:** Distinct visual badges for upcoming technical, system design, or HR rounds.
+### 4. ⏰ Follow-ups & Scheduled Interviews Hub
+- **Unified Action Timeline:** Centralized hub for next action items, recruiter deadlines, and scheduled rounds.
+- **Status Chips:** Filter by Active Tasks, This Week, Overdue, Interviews, and Completed.
+- **Task Completion Checkbox:** Toggle task completion with automated timestamp updates.
 
-### 5. 🔒 Data Safety, Privacy & Portability
-- **JSON Backup:** Download a full timestamped JSON backup (`jobtrack-backup-YYYY-MM-DD.json`) anytime.
-- **Safe JSON Restore:** Validates file structure, previews record counts, and allows choosing between **"Merge with existing"** (deduplicating by company and role) or **"Replace all"**.
-- **RFC-4180 CSV Export:** Exports a clean, spreadsheet-ready CSV compatible with Excel, Google Sheets, and Apple Numbers.
-- **Storage Meter:** Displays actual kilobytes consumed in the browser against standard localStorage quotas.
-- **100% Backward Compatible:** Safely loads legacy application records without data corruption or loss.
+### 5. 📧 Real-Time Admin Email Alerts (Resend)
+Dispatches automated email notifications directly to `syedaman996455@gmail.com` when:
+- 🆕 A new application is created
+- 📝 An application is edited
+- 🔄 An application changes stage (e.g. Applied ➔ Interview)
+- 🗑️ An application is deleted
+*(Non-blocking: email provider downtime never disrupts database writes).*
+
+### 6. 🔒 Safe Migration & Data Portability
+- **Non-Destructive Cloud Migration:** Automatically prompts to download a local JSON backup before syncing browser `localStorage` records into PostgreSQL.
+- **Manual Backups:** One-click JSON backup download and RFC-4180 CSV export for spreadsheets.
 
 ---
 
@@ -70,153 +96,78 @@ Searching for software engineering opportunities involves juggling dozens of con
 
 | Layer | Technology | Rationale |
 | :--- | :--- | :--- |
-| **Framework** | [React 19](https://react.dev/) | Modern component architecture, functional hooks, and high rendering efficiency. |
-| **Build Tool** | [Vite 8](https://vite.dev/) | Instant hot module replacement (HMR) and optimized rollup production bundles. |
-| **Styling** | Custom Vanilla CSS | 100% control over design tokens, responsive breakpoints, accessible focus rings, and zero bundle bloat. |
-| **Charts** | [Recharts](https://recharts.org/) | Responsive SVG charts (Pie/Donut and Bar) styled to match the editorial palette. |
-| **Icons** | [Lucide React](https://lucide.dev/) | Clean, consistent, lightweight stroke iconography. |
-| **Testing** | [Vitest](https://vitest.dev/) | Ultra-fast unit testing for storage migrations, date arithmetic, and CSV generation. |
-| **Linter** | [Oxlint](https://oxc.rs/) | High-speed Rust-based static code analysis ensuring React purity and clean code standards. |
-| **Deployment** | [Netlify](https://www.netlify.com/) | Continuous deployment linked directly to GitHub `main` branch. |
+| **Frontend** | [React 19](https://react.dev/) + [Vite 8](https://vite.dev/) | Modern component architecture, instant HMR, high performance. |
+| **Database & Auth** | [Supabase](https://supabase.com/) (PostgreSQL) | Managed PostgreSQL with native Row Level Security (RLS) and JWT auth. |
+| **Serverless Backend** | [Netlify Functions](https://www.netlify.com/platform/core/functions/) | Secure server-side execution for email dispatch without secret leakage. |
+| **Email Delivery** | [Resend](https://resend.com/) | Modern transactional email API with 3,000 free monthly emails. |
+| **Styling** | Custom Vanilla CSS | Tailored warm ivory, charcoal, and olive palette with zero CSS bundle bloat. |
+| **Charts** | [Recharts](https://recharts.org/) | Responsive SVG charts (Pie/Donut and Bar). |
+| **Testing** | [Vitest](https://vitest.dev/) | Unit test suite covering auth logic, database mapping, and data utilities. |
+| **Linter** | [Oxlint](https://oxc.rs/) | High-speed Rust linter ensuring React purity and clean code standards. |
 
 ---
 
-## 🏗️ Architecture & Project Structure
+## 🚀 Setup Guide & Environment Variables
 
-```text
-job-application-tracker/
-├── .planning/                       # GSD Spec-driven development documentation
-│   ├── PROJECT.md                   # Vision and constraints
-│   ├── ROADMAP.md                   # Multi-phase milestones
-│   └── STATE.md                     # Current project state
-├── public/                          # Static assets and favicons
-│   ├── favicon.svg
-│   └── icons.svg
-├── src/
-│   ├── components/
-│   │   ├── applications/            # Directory table, add/edit form, details modal
-│   │   │   ├── ApplicationDetailModal.jsx
-│   │   │   ├── ApplicationFormModal.jsx
-│   │   │   └── ApplicationsTable.jsx
-│   │   ├── common/                  # Shared accessible primitives
-│   │   │   ├── Badge.jsx
-│   │   │   ├── ConfirmDialog.jsx
-│   │   │   ├── EmptyState.jsx
-│   │   │   ├── Modal.jsx
-│   │   │   └── Toast.jsx
-│   │   ├── dashboard/               # KPI cards, charts, urgent actions widget
-│   │   │   └── DashboardView.jsx
-│   │   ├── data/                    # Storage meter, JSON backup/restore, CSV export
-│   │   │   └── DataSafetyHub.jsx
-│   │   ├── followups/               # Tasks, reminders, interview schedule
-│   │   │   └── FollowUpHub.jsx
-│   │   ├── kanban/                  # Pipeline board, columns, and cards
-│   │   │   └── KanbanBoard.jsx
-│   │   ├── layout/                  # Responsive sidebar and app header
-│   │   │   ├── Header.jsx
-│   │   │   └── Sidebar.jsx
-│   │   └── settings/                # Preferences and portfolio about section
-│   │       └── SettingsView.jsx
-│   ├── utils/
-│   │   ├── __tests__/               # Automated unit tests
-│   │   │   ├── date.test.js
-│   │   │   └── storage.test.js
-│   │   ├── date.js                  # Pure date calculations and relative formatters
-│   │   └── storage.js               # Normalization, localStorage, CSV & JSON parsers
-│   ├── App.css                      # Cohesive editorial SaaS design system
-│   ├── App.jsx                      # Root application controller and routing
-│   ├── index.css                    # Design tokens, CSS reset, and variables
-│   └── main.jsx                     # Entry mounting with React StrictMode
-├── index.html                       # HTML5 entry with preconnected Google Fonts
-├── package.json                     # Scripts, dependencies, and metadata
-└── vite.config.js                   # Vite configuration
+### 1. Supabase Setup (2 Minutes)
+1. Log in to [Supabase](https://supabase.com) and create a new project.
+2. Open the **SQL Editor** in the Supabase Dashboard.
+3. Paste and run the contents of [`supabase/migrations/01_init.sql`](./supabase/migrations/01_init.sql). This creates the `applications` table, indexes, updated_at trigger, and Row Level Security policies.
+4. Go to **Authentication** ➔ **Users** and click **Add User** ➔ **Create User**:
+   - Email: `syedaman996455@gmail.com`
+   - Password: Choose a strong master password.
+5. In **Authentication** ➔ **Providers** ➔ **Email**, ensure **Confirm email** is set or confirmed.
+6. Copy your **Project URL** and **anon public key** from **Project Settings** ➔ **API**.
+
+### 2. Resend Setup (1 Minute)
+1. Sign up at [Resend](https://resend.com).
+2. Go to **API Keys** and generate a new key (e.g. `re_...`).
+
+### 3. Netlify Environment Variables Configuration
+In your Netlify Dashboard for `silly-cobbler-3a5f27`:
+Navigate to **Site configuration** ➔ **Environment variables**, and add:
+
+```env
+# Frontend (Public)
+VITE_SUPABASE_URL=https://your-project-id.supabase.co
+VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
+VITE_ADMIN_EMAIL=syedaman996455@gmail.com
+
+# Backend / Serverless (Private)
+RESEND_API_KEY=re_your_secret_resend_api_key
+ADMIN_NOTIFICATION_EMAIL=syedaman996455@gmail.com
+RESEND_FROM_EMAIL=JobTrack Alerts <onboarding@resend.dev>
 ```
-
----
-
-## 🚀 Getting Started Locally
-
-### Prerequisites
-- [Node.js](https://nodejs.org/) (v18.0 or higher recommended; verified on v24)
-- npm (v9 or higher)
-
-### Installation
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/Syedaman9964/job-application-tracker.git
-   cd job-application-tracker
-   ```
-
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-
-3. Launch development server:
-   ```bash
-   npm run dev
-   ```
-   Open `http://localhost:5173` in your browser.
 
 ---
 
 ## 🧪 Testing & Verification
 
-The project includes an automated test suite and static analysis configuration:
+```bash
+# Run automated Vitest unit tests (13 tests)
+npm test
 
-- **Run unit tests:**
-  ```bash
-  npm test
-  ```
-  Runs Vitest tests covering backward compatibility, legacy normalization, RFC-4180 CSV escaping, JSON envelope parsing, and date calculation accuracy.
+# Run Oxlint static analysis
+npm run lint
 
-- **Run code quality linter:**
-  ```bash
-  npm run lint
-  ```
-  Runs Oxlint to check for React purity warnings, unused identifiers, and syntax correctness.
-
-- **Run production build:**
-  ```bash
-  npm run build
-  ```
-  Compiles optimized production bundles in `dist/`.
+# Compile optimized production bundle
+npm run build
+```
 
 ---
 
-## 📸 Genuine Screenshot Capturing Guide
+## 🔐 Data Ownership & Free-Tier Limits
 
-To showcase genuine screenshots of the application in your portfolio:
-
-1. Start the application locally via `npm run dev` or open the [live site](https://silly-cobbler-3a5f27.netlify.app).
-2. Go to **Settings** and click **"Load Curated Demo Applications"** to populate realistic records across all pipeline stages.
-3. Capture full-resolution screenshots:
-   - **Dashboard Overview:** Navigate to `Dashboard` and capture the KPI cards, Weekly Target bar, and Recharts donut and bar charts.
-   - **Applications Directory:** Navigate to `Applications` and capture the filtered table with company logos, status badges, and search results.
-   - **Pipeline Board:** Navigate to `Pipeline Board` and capture the 5-column Kanban board with cards distributed across stages.
-   - **Follow-ups & Interviews:** Navigate to `Follow-ups & Dates` and capture the scheduled interview cards and active task items.
-4. Save the images to an `assets/` or `screenshots/` directory and link them in this README.
-
----
-
-## 🔐 Data Privacy & Limitations
-
-- **Browser-Bound Storage:** All applications are stored in your device's browser `localStorage`. Clearing your browser data will delete local records. Always use the **"Download JSON Backup"** feature in **Data & Backups** to keep an archive.
-- **Single Device:** Because this application does not use an external cloud database or authentication server, data does not automatically synchronize across different browsers or devices. Transfer data between devices by exporting and restoring JSON backups.
-- **Storage Limits:** Standard browser localStorage provides approximately 5 MB of capacity, which is sufficient to store several thousand detailed job applications and interview notes.
-
----
-
-## 🗺️ Roadmap & Future Enhancements
-
-- [ ] Chrome extension integration to clip job postings directly from LinkedIn and Indeed.
-- [ ] Resume version matching: associate specific resume PDFs or links with individual applications.
-- [ ] Email reminder integration using `.ics` calendar invitation downloads for scheduled interviews.
-- [ ] Dark mode toggle respecting system preferences while preserving the warm editorial palette.
+- **Hosting & Database:** Data is stored in Supabase's managed AWS PostgreSQL. Data is encrypted in transit (TLS 1.3) and at rest.
+- **Free Tier Allocations:**
+  - Supabase: 500 MB database (stores 50,000+ applications). Inactive projects pause after 7 days without queries; logging in keeps it active.
+  - Resend: 3,000 emails/month (100 emails/day), more than sufficient for personal job tracking.
+  - Netlify: 100 GB bandwidth, 125,000 function invocations/month.
+- **Ongoing Cost:** **$0 / month**.
 
 ---
 
 ## 📄 License
 
-This project is open-source under the [MIT License](LICENSE).
-Built with craftsmanship for software engineering fresher portfolios.
+This project is open-source under the [MIT License](LICENSE).  
+Designed with engineering craftsmanship for personal career tracking and software engineering portfolios.

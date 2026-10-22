@@ -6,6 +6,7 @@ import {
   ShieldCheck,
   HardDrive,
   Trash2,
+  CloudUpload,
 } from 'lucide-react'
 import {
   getStorageUsage,
@@ -22,6 +23,9 @@ export default function DataSafetyHub({
   onImportApplications,
   onClearAllData,
   onShowToast,
+  onOpenMigrationModal,
+  isCloudConfigured = false,
+  localRecordCount = 0,
 }) {
   const fileInputRef = useRef(null)
   const usage = getStorageUsage()
@@ -126,6 +130,43 @@ export default function DataSafetyHub({
           </p>
         </div>
       </div>
+
+      {/* Cloud Migration Card */}
+      {isCloudConfigured && (
+        <div className="data-card highlight-card">
+          <div className="data-card-header">
+            <div className="card-header-icon highlight">
+              <CloudUpload size={18} />
+            </div>
+            <div>
+              <h3 className="card-title">Cloud Database & Safe Migration</h3>
+              <p className="card-subtitle">
+                PostgreSQL with Row Level Security is active and connected
+              </p>
+            </div>
+          </div>
+          <div className="cloud-sync-body">
+            <p>
+              Your cloud database allows private cross-device access to your applications.
+              {localRecordCount > 0 ? (
+                <> You have <strong>{localRecordCount}</strong> records in browser storage available to migrate.</>
+              ) : (
+                <> All records are securely synchronized with PostgreSQL RLS.</>
+              )}
+            </p>
+            {localRecordCount > 0 && onOpenMigrationModal && (
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={onOpenMigrationModal}
+              >
+                <CloudUpload size={16} />
+                <span>Launch Migration Wizard ({localRecordCount} local records)</span>
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Storage Quota Card */}
       <div className="data-card">
