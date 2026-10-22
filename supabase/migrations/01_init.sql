@@ -1,13 +1,12 @@
 -- ============================================================================
--- Migration: 01_init.sql
--- Description: Create applications table with strict Row Level Security (RLS)
--- Target Admin Email: syedaman996455@gmail.com
+-- Migration: 01_init.sql (Refined & Idempotent)
+-- Target Administrator: syedaman996455@gmail.com
 -- ============================================================================
 
--- 1. Create table
+-- 1. Create applications table
 CREATE TABLE IF NOT EXISTS public.applications (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+    user_id UUID DEFAULT auth.uid() REFERENCES auth.users(id) ON DELETE CASCADE,
     company TEXT NOT NULL,
     role TEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'Applied' CHECK (status IN ('Wishlist', 'Applied', 'Interview', 'Offer', 'Rejected')),
@@ -52,10 +51,15 @@ CREATE TRIGGER trigger_applications_updated_at
 -- 4. Enable Row Level Security (RLS)
 ALTER TABLE public.applications ENABLE ROW LEVEL SECURITY;
 
--- 5. Strict Single-Admin Access Policies
--- Only authenticated sessions where auth.jwt() ->> 'email' = 'syedaman996455@gmail.com' are allowed.
+-- 5. Explicit table permissions
+GRANT USAGE ON SCHEMA public TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.applications TO authenticated;
+REVOKE ALL ON public.applications FROM anon;
 
--- Allow SELECT only to verified administrator
+-- 6. Strict Single-Admin Access Policies (Idempotent)
+
+-- SELECT: Only syedaman996455@gmail.com can read applications
+DROP POLICY IF EXISTS "Admin exclusive SELECT access" ON public.applications;
 CREATE POLICY "Admin exclusive SELECT access"
 ON public.applications
 FOR SELECT
@@ -64,17 +68,19 @@ USING (
     (auth.jwt() ->> 'email') = 'syedaman996455@gmail.com'
 );
 
--- Allow INSERT only to verified administrator (and automatically associate user_id)
+-- INSERT: Only syedaman996455@gmail.com can insert applications
+DROP POLICY IF EXISTS "Admin exclusive INSERT access" ON public.applications;
 CREATE POLICY "Admin exclusive INSERT access"
 ON public.applications
 FOR INSERT
 TO authenticated
 WITH CHECK (
     (auth.jwt() ->> 'email') = 'syedaman996455@gmail.com'
-    AND auth.uid() = user_id
+    AND (user_id = auth.uid() OR user_id IS NULL)
 );
 
--- Allow UPDATE only to verified administrator
+-- UPDATE: Only syedaman996455@gmail.com can update applications
+DROP POLICY IF EXISTS "Admin exclusive UPDATE access" ON public.applications;
 CREATE POLICY "Admin exclusive UPDATE access"
 ON public.applications
 FOR UPDATE
@@ -86,7 +92,8 @@ WITH CHECK (
     (auth.jwt() ->> 'email') = 'syedaman996455@gmail.com'
 );
 
--- Allow DELETE only to verified administrator
+-- DELETE: Only syedaman996455@gmail.com can delete applications
+DROP POLICY IF EXISTS "Admin exclusive DELETE access" ON public.applications;
 CREATE POLICY "Admin exclusive DELETE access"
 ON public.applications
 FOR DELETE
@@ -94,6 +101,3 @@ TO authenticated
 USING (
     (auth.jwt() ->> 'email') = 'syedaman996455@gmail.com'
 );
-
--- Revoke all permissions from anon public role
-REVOKE ALL ON public.applications FROM anon;

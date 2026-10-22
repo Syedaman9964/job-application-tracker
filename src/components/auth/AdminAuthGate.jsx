@@ -98,20 +98,60 @@ export default function AdminAuthGate({ children }) {
     )
   }
 
-  // Graceful fallback if Supabase is not configured yet (e.g. initial clone before .env setup)
+  // Fail-Closed: If Supabase credentials are not configured, block access to private pipeline data
   if (!isSupabaseConfigured()) {
     return (
-      <>
-        <div className="cloud-pending-banner">
-          <div className="pending-banner-content">
-            <span className="pending-tag">DEVELOPMENT MODE</span>
-            <span>
-              Cloud backend is not yet linked. Running in <strong>Local Storage</strong> mode. Configure Supabase credentials to enable admin authentication and multi-device cloud sync.
-            </span>
+      <div className="auth-gate-screen">
+        <div className="auth-card">
+          <div className="auth-header">
+            <div className="auth-icon-wrap">
+              <Lock size={24} />
+            </div>
+            <h2 className="auth-title">Backend Configuration Required</h2>
+            <p className="auth-subtitle">
+              JobTrack is locked. Cloud security credentials are required to authenticate the administrator and access this pipeline.
+            </p>
+          </div>
+
+          <div className="admin-email-pill">
+            <ShieldCheck size={14} className="pill-icon" />
+            <span>Target Administrator: <strong>{TARGET_ADMIN_EMAIL}</strong></span>
+          </div>
+
+          <div className="auth-alert error" role="alert">
+            <AlertCircle size={16} />
+            <span>Missing or invalid Supabase credentials in <code>.env.local</code>.</span>
+          </div>
+
+          <div
+            style={{
+              fontSize: '13px',
+              lineHeight: 1.6,
+              color: 'var(--text-muted, #737467)',
+              textAlign: 'left',
+              background: 'var(--bg-muted, #f4f3ec)',
+              padding: '14px 16px',
+              borderRadius: '8px',
+              border: '1px solid var(--border-subtle, #eeede4)',
+              margin: '16px 0',
+            }}
+          >
+            <p style={{ margin: '0 0 8px', fontWeight: 600, color: 'var(--text-primary, #161713)' }}>
+              Required Setup Steps:
+            </p>
+            <ol style={{ margin: 0, paddingLeft: '20px' }}>
+              <li>Create <code>.env.local</code> in the project root directory.</li>
+              <li>Add <code>VITE_SUPABASE_URL</code> and <code>VITE_SUPABASE_ANON_KEY</code>.</li>
+              <li>Restart the dev server (<code>npm run dev</code>).</li>
+            </ol>
+          </div>
+
+          <div className="auth-footer-notice">
+            <span>Fail-Closed Security Active</span>
+            <span>Private pipeline data is protected from unauthenticated access.</span>
           </div>
         </div>
-        {children}
-      </>
+      </div>
     )
   }
 

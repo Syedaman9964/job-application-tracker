@@ -3,6 +3,7 @@ import {
   isAdminUser,
   mapRowToApplication,
   mapApplicationToRow,
+  mapUpdatesToRow,
   TARGET_ADMIN_EMAIL,
 } from '../supabaseClient.js'
 
@@ -80,5 +81,20 @@ describe('supabaseClient security & mapping utilities', () => {
     expect(row.job_url).toBe('https://careers.google.com')
     expect(row.next_follow_up).toBe('2026-10-27')
     expect(row.next_follow_up_done).toBe(false)
+  })
+
+  it('maps partial updates without polluting untouched database columns', () => {
+    const partial = {
+      status: 'Interview',
+      nextFollowUpDone: true,
+    }
+
+    const row = mapUpdatesToRow(partial)
+
+    expect(row.status).toBe('Interview')
+    expect(row.next_follow_up_done).toBe(true)
+    expect(row.company).toBeUndefined()
+    expect(row.role).toBeUndefined()
+    expect(row.location).toBeUndefined()
   })
 })

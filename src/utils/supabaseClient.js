@@ -8,15 +8,24 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
 /**
- * Checks whether Supabase environment variables are provided.
+ * Checks whether Supabase environment variables are provided and valid (non-placeholder).
  */
 export function isSupabaseConfigured() {
-  return Boolean(
-    supabaseUrl &&
-    supabaseAnonKey &&
-    supabaseUrl !== 'https://your-project-id.supabase.co' &&
-    supabaseAnonKey !== 'your-supabase-anon-publishable-key',
-  )
+  if (!supabaseUrl || !supabaseAnonKey) return false
+  const cleanUrl = String(supabaseUrl).trim().toLowerCase()
+  const cleanKey = String(supabaseAnonKey).trim()
+
+  const isPlaceholderUrl =
+    cleanUrl.includes('your-project-id') ||
+    cleanUrl.includes('your-project-ref') ||
+    cleanUrl.includes('example.com') ||
+    !cleanUrl.startsWith('https://')
+  const isPlaceholderKey =
+    cleanKey.includes('your-supabase-anon') ||
+    cleanKey.includes('your-actual-anon') ||
+    cleanKey.length < 20
+
+  return !isPlaceholderUrl && !isPlaceholderKey
 }
 
 /**
@@ -194,12 +203,42 @@ export async function insertCloudApplication(app, userId) {
 }
 
 /**
+ * Maps partial updates (camelCase) to database row fields (snake_case).
+ * Only sets defined properties so existing database columns are preserved.
+ */
+export function mapUpdatesToRow(updates) {
+  if (!updates || typeof updates !== 'object') return {}
+  const row = {}
+
+  if (updates.company !== undefined) row.company = updates.company
+  if (updates.role !== undefined) row.role = updates.role
+  if (updates.status !== undefined) row.status = updates.status
+  if (updates.date !== undefined) row.date = updates.date
+  if (updates.location !== undefined) row.location = updates.location
+  if (updates.employmentType !== undefined) row.employment_type = updates.employmentType
+  if (updates.source !== undefined) row.source = updates.source
+  if (updates.salary !== undefined) row.salary = updates.salary
+  if (updates.jobUrl !== undefined) row.job_url = updates.jobUrl
+  if (updates.jobDescription !== undefined) row.job_description = updates.jobDescription
+  if (updates.notes !== undefined) row.notes = updates.notes
+  if (updates.nextFollowUp !== undefined) row.next_follow_up = updates.nextFollowUp || null
+  if (updates.nextFollowUpNote !== undefined) row.next_follow_up_note = updates.nextFollowUpNote
+  if (updates.nextFollowUpDone !== undefined) row.next_follow_up_done = Boolean(updates.nextFollowUpDone)
+  if (updates.interviewDate !== undefined) {
+    row.interview_date = updates.interviewDate ? new Date(updates.interviewDate).toISOString() : null
+  }
+  if (updates.interviewNotes !== undefined) row.interview_notes = updates.interviewNotes
+
+  return row
+}
+
+/**
  * Updates an existing application in the cloud database.
  */
 export async function updateCloudApplication(id, updates) {
   if (!supabase) throw new Error('Supabase is not configured')
 
-  const row = mapApplicationToRow(updates)
+  const row = mapUpdatesToRow(updates)
   const { data, error } = await supabase
     .from('applications')
     .update(row)
